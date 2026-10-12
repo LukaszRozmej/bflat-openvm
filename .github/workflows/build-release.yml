@@ -190,7 +190,7 @@ jobs:
 
   build-nupkg:
     name: Build NuGet package
-    needs: build-libopenvm
+    needs: run-u256-vectors
     runs-on: ubuntu-latest
     permissions:
       contents: read
