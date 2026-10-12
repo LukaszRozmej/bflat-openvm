@@ -134,3 +134,9 @@ locals, so this applies only to `src/openvm_intrinsics` used directly.
 
 **`zkvm_keccak_xorin` absorbs at most 136 bytes** (`KECCAK_RATE`); a larger
 length executes but fails to prove. `zkvm_keccak256` chunks for you.
+
+**`zkvm_u512_divrem_hint` runs only on a runner that registers its phantom**
+(`runner/`); on any other the instruction transpiles to `unimp` and traps. Its
+quotient and remainder are unchecked: accept them only after
+`zkvm_u512_is_divrem` returns 1. That check and `zkvm_u256_mul_wide` are plain
+RV64IM routines, not extension instructions.
