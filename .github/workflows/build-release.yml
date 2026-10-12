@@ -190,7 +190,7 @@ jobs:
 
   build-nupkg:
     name: Build NuGet package
-    needs: build-libopenvm
+    needs: run-secp256k1-guest
     runs-on: ubuntu-latest
     permissions:
       contents: read
