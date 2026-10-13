@@ -150,9 +150,27 @@ jobs:
         run: |
           python3 bflat-openvm/tests/integration/check_image.py guest --require-custom --no-atomics
 
+  run-divrem-vectors:
+    name: Run division hints and arithmetic on OpenVM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install RISC-V binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils-riscv64-linux-gnu
+
+      - name: Build the runner with the division hint
+        run: docker build -t openvm-divrem-test runner
+
+      - name: Execute the vectors
+        run: bash tests/divrem/run.sh openvm-divrem-test
+
   build-nupkg:
     name: Build NuGet package
-    needs: build-libopenvm
+    needs: [build-libopenvm, run-divrem-vectors]
     runs-on: ubuntu-latest
     permissions:
       contents: read

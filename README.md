@@ -134,3 +134,16 @@ locals, so this applies only to `src/openvm_intrinsics` used directly.
 
 **`zkvm_keccak_xorin` absorbs at most 136 bytes** (`KECCAK_RATE`); a larger
 length executes but fails to prove. `zkvm_keccak256` chunks for you.
+
+**`zkvm_u512_divrem_hint` runs only on a runner that registers its phantom**
+(`runner/`); on any other the instruction transpiles to `unimp` and traps. Its
+quotient and remainder are unchecked: accept them only after
+`zkvm_u512_is_divrem` returns 1. That check and `zkvm_u256_mul_wide` are plain
+RV64IM routines, not extension instructions.
+
+CI builds the runner from this repository and runs `tests/divrem/run.sh` against
+it. The generated RV64 guest links the assembly above and checks wide products,
+hint round trips, and rejection of invalid pairs against Python integer results.
+To run locally, build an image with `docker build -t openvm-divrem-test runner`,
+then run `bash tests/divrem/run.sh openvm-divrem-test` (Python 3 and RISC-V
+binutils required).
