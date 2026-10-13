@@ -1,0 +1,27 @@
+# Host harness for src/accel-rs/src/ecrecover.rs, driven by test_ecrecover.py.
+#
+# The module is compiled in from the accelerator crate as is. Off the OpenVM
+# target the OpenVM types fall back to plain big-integer arithmetic, and the
+# module's `host` stand-ins fail on any use the chips would not prove: an
+# addition with equal x, a point off the curve or at infinity, a comparison of
+# an unreduced coordinate.
+[package]
+name = "secp256k1-ecrecover-harness"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "harness"
+path = "src/main.rs"
+
+[dependencies]
+openvm-algebra-guest = { git = "https://github.com/openvm-org/openvm.git", branch = "develop-v2.1.0" }
+openvm-ecc-guest     = { git = "https://github.com/openvm-org/openvm.git", branch = "develop-v2.1.0" }
+openvm-k256          = { git = "https://github.com/openvm-org/openvm.git", branch = "develop-v2.1.0", package = "k256" }
+
+[workspace]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(openvm_intrinsics)'] }

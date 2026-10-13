@@ -5,9 +5,10 @@
 //!
 //! A C#/NativeAOT guest cannot reach OpenVM's accelerators the way Rust guests
 //! do - by swapping crypto crates through `[patch.crates-io]` - so it goes
-//! through the C ABI instead. All 19 accelerator entry points come from
-//! OpenVM's own `openvm-accelerators` crate; this crate contributes the three
-//! things that crate leaves to the program:
+//! through the C ABI instead. All 19 accelerator entry points but
+//! `zkvm_secp256k1_ecrecover` come from OpenVM's own `openvm-accelerators`
+//! crate; this crate replaces that one (`ecrecover`, see there for why) and
+//! contributes the three things that crate leaves to the program:
 //!
 //! 1. `init` - the moduli, complex extensions and curves the accelerated
 //!    arithmetic is instantiated over. `cargo openvm` generates this for a
@@ -30,8 +31,10 @@
 
 extern crate alloc;
 
+mod ecrecover;
 mod init;
 mod io;
+mod secp256k1_tables;
 mod sync;
 
 // Re-export so the accelerators' `#[no_mangle]` symbols are reachable roots of

@@ -57,7 +57,8 @@ All 19 accelerators, plus both IO entry points:
 | Entry points | Implementation |
 |---|---|
 | `zkvm_keccak256`, `zkvm_sha256` | OpenVM's keccak and sha2 extensions |
-| `zkvm_secp256k1_verify`, `zkvm_secp256k1_ecrecover`, `zkvm_secp256r1_verify` | the accelerated `k256` / `p256` |
+| `zkvm_secp256k1_verify`, `zkvm_secp256r1_verify` | the accelerated `k256` / `p256` |
+| `zkvm_secp256k1_ecrecover` | `src/accel-rs/src/ecrecover.rs`: GLV and wNAF on the ecc and algebra extensions |
 | `zkvm_bn254_g1_add`, `zkvm_bn254_g1_mul`, `zkvm_bn254_pairing` | the pairing extension |
 | `zkvm_bls12_g1_add`, `g1_msm`, `g2_add`, `g2_msm`, `pairing`, `map_fp_to_g1`, `map_fp2_to_g2` | the pairing extension |
 | `zkvm_kzg_point_eval` | `openvm-kzg` |
@@ -70,6 +71,13 @@ custom-0 and custom-1 instructions to catch a silent fallback to portable Rust.
 CI then links a real bflat guest that calls all 21 through direct P/Invoke
 (`tests/integration/guest.cs`) — which is what proves the symbols not only
 exist but survive a guest's link.
+
+`zkvm_secp256k1_ecrecover` is ours rather than openvm-eth's, so it is also
+tested for results: `tests/secp256k1/test_ecrecover.py` diffs a host build of
+it against a Python reference over known, random, malformed and adversarial
+vectors, failing on any curve operation the OpenVM chips would not prove, and
+CI runs the same vectors through `tests/secp256k1/guest.cs` on the OpenVM
+runner.
 
 ## The output window is 32 bytes
 

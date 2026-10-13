@@ -57,6 +57,16 @@ RUST_LIB="${ACCEL_DIR}/target/${TARGET_NAME}/release/libopenvmaccel.a"
 [ -f "${RUST_LIB}" ] || fail "${RUST_LIB} not produced"
 cp "${RUST_LIB}" "${OUTPUT_DIR}/libopenvm.a"
 
+# src/ecrecover.rs replaces openvm-eth's zkvm_secp256k1_ecrecover (see there
+# for why). One crate graph cannot define an unmangled symbol twice, so ours is
+# built as bflat_secp256k1_ecrecover: make openvm-eth's local, then give ours
+# the interface name. Two passes, because objcopy matches --localize-symbol
+# against the name after --redefine-sym.
+"${OBJCOPY}" --localize-symbol=zkvm_secp256k1_ecrecover "${OUTPUT_DIR}/libopenvm.a" \
+    || fail "objcopy failed"
+"${OBJCOPY}" --redefine-sym=bflat_secp256k1_ecrecover=zkvm_secp256k1_ecrecover \
+    "${OUTPUT_DIR}/libopenvm.a" || fail "objcopy failed"
+
 # The archive exports far more than the interface. Two sources:
 #
 #   - The accelerated k256/p256 pull in the whole `openvm` guest runtime, which
@@ -132,6 +142,10 @@ for sym in ${STANDARD_SURFACE} ; do
     echo "${defined}" | grep -qx "${sym}" || missing="${missing} ${sym}"
 done
 [ -z "${missing}" ] || fail "missing from the archive:${missing}"
+[ "$(echo "${defined}" | grep -cx zkvm_secp256k1_ecrecover)" -eq 1 ] \
+    || fail "zkvm_secp256k1_ecrecover is not defined exactly once"
+echo "${defined}" | grep -qx bflat_secp256k1_ecrecover \
+    && fail "bflat_secp256k1_ecrecover was not renamed"
 
 # The reverse check: nothing the guest also defines may stay global, or the
 # link fails on a duplicate symbol instead of a missing one.
