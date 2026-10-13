@@ -188,9 +188,27 @@ jobs:
           echo "$out"
           [ "$out" = "public_values=$expected" ]             || { echo "::error::secp256k1 vectors failed: expected $expected"; exit 1; }
 
+  run-divrem-vectors:
+    name: Run division hints and arithmetic on OpenVM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install RISC-V binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils-riscv64-linux-gnu
+
+      - name: Build the runner with the division hint
+        run: docker build -t openvm-divrem-test runner
+
+      - name: Execute the vectors
+        run: bash tests/divrem/run.sh openvm-divrem-test
+
   build-nupkg:
     name: Build NuGet package
-    needs: run-secp256k1-guest
+    needs: [build-libopenvm, run-divrem-vectors, run-secp256k1-guest]
     runs-on: ubuntu-latest
     permissions:
       contents: read

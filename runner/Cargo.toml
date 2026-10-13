@@ -10,6 +10,16 @@ edition = "2021"
 [dependencies]
 openvm-sdk = { workspace = true }
 openvm-sdk-config = { workspace = true }
+openvm-circuit = { workspace = true }
+openvm-instructions = { workspace = true }
+openvm-transpiler = { workspace = true }
+openvm-riscv-circuit = { workspace = true }
+openvm-stark-backend = { workspace = true }
+openvm-cpu-backend = { workspace = true }
+openvm-stark-sdk = { workspace = true }
+num-bigint = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
 toml = { workspace = true }
 hex = { workspace = true }
 eyre = { workspace = true }
