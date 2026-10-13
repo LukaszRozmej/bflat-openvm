@@ -2,6 +2,7 @@ output/
 tmp/
 *.o
 src/accel-rs/target/
+tests/secp256k1/target/
 src/runtime/runtimes/
 src/runtime/*.bflat.manifest
 artifacts/

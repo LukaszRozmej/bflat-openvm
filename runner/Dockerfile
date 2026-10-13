@@ -33,7 +33,8 @@ COPY src crates/runelf/src
 # rather than as a standalone crate with git dependencies.
 RUN sed -i '0,/^members = \[/s//members = [\n    "crates\/runelf",/' Cargo.toml \
  && grep -q 'crates/runelf' Cargo.toml
-RUN cargo build --release -p openvm-runelf
+RUN cargo test --release -p openvm-runelf \
+ && cargo build --release -p openvm-runelf
 
 FROM debian:bookworm-slim
 RUN apt-get update \

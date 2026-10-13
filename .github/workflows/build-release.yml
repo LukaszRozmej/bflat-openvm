@@ -40,6 +40,14 @@ jobs:
           rustup toolchain install nightly --component rust-src --profile minimal
           rustup run nightly rustc --version
 
+      - name: Check the generated secp256k1 tables
+        run: python3 src/accel-rs/gen_tables.py --check
+
+      - name: Test secp256k1 recovery on the host
+        # Fails on any curve operation the OpenVM chips would not prove, and
+        # diffs every result against a Python reference.
+        run: python3 tests/secp256k1/test_ecrecover.py
+
       - name: Build static library
         run: ./build/build.sh
 
@@ -137,8 +145,9 @@ jobs:
             --no-pie --no-pthread -Ot \
             --extlib "$PWD/bflat-openvm/output/libopenvm.bflat.manifest" \
             -o u256
+          bflat-riscv64/src/bflat/bin/Debug/net10.0/bflat build             bflat-openvm/tests/secp256k1/guest.cs             --os linux --arch riscv64 --libc openvm --stdlib dotnet             --no-pie --no-pthread -Ot             --extlib "$PWD/bflat-openvm/output/libopenvm.bflat.manifest"             -o secp256k1-guest
 
-      - name: Upload the linked guest
+      - name: Upload the linked guests
         # Keeping the image makes an "N instructions the VM cannot decode"
         # report something you can go and disassemble, instead of a number.
         uses: actions/upload-artifact@v4
@@ -147,6 +156,7 @@ jobs:
           path: |
             guest
             u256
+            secp256k1-guest
 
       - name: Check the linked image
         # --no-atomics is now enforced: bflat's nothread module displaces the
@@ -188,9 +198,54 @@ jobs:
           [ "$out" = "public_values=0000000000000000bc0100000000000000000000000000000000000000000000" ] \
             || { echo "::error::u256 vectors failed: $out"; exit 1; }
 
+  run-secp256k1-guest:
+    # The host test emulates the chips' preconditions; this runs the recovery
+    # on OpenVM itself, against the same reference, adversarial vectors
+    # included.
+    name: Run secp256k1 recovery on OpenVM
+    needs: link-guest
+    runs-on: ubuntu-latest
+    env:
+      OPENVM_IMAGE: nethermindeth/openvm-runner:v2.1.0-rv64@sha256:d8209a5db5d59df6d6f5899b2ce6866f81c30bdc3df952dc78243b8316706baa
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Download the linked guests
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-guest
+          path: guests
+
+      - name: Run the vectors
+        run: |
+          expected=$(python3 tests/secp256k1/test_ecrecover.py --openvm-vectors guests/vectors.bin)
+          cp runner/openvm.toml guests/
+          out=$(docker run --rm -v "$PWD/guests:/n" "$OPENVM_IMAGE" /n/secp256k1-guest /n/openvm.toml /n/vectors.bin | tail -1)
+          echo "$out"
+          [ "$out" = "public_values=$expected" ]             || { echo "::error::secp256k1 vectors failed: expected $expected"; exit 1; }
+
+  run-divrem-vectors:
+    name: Run division hints and arithmetic on OpenVM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install RISC-V binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils-riscv64-linux-gnu
+
+      - name: Build the runner with the division hint
+        run: docker build -t openvm-divrem-test runner
+
+      - name: Execute the vectors
+        run: bash tests/divrem/run.sh openvm-divrem-test
+
   build-nupkg:
     name: Build NuGet package
-    needs: run-u256-vectors
+    needs: [build-libopenvm, run-divrem-vectors, run-secp256k1-guest, run-u256-vectors]
     runs-on: ubuntu-latest
     permissions:
       contents: read
