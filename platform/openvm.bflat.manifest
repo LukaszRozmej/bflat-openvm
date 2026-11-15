@@ -44,6 +44,22 @@
         "note": "Elide the RA spill/reload and frame in leaf methods (dotnet-riscv patches 23 and 31). Sound only on a single-threaded deterministic guest with no GC thread suspension and no return-address hijacking."
       },
       {
+        "value": "JitInlineAdditionalMultiplier=3",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup perf-57: code size is free on the zkVM and each avoided call saves its ABI overhead. -1.39% OpenVM cycles on the 11 Nethermind stateless blocks (each knob measured against the other three)."
+      },
+      {
+        "value": "JitZkNoPinning=1",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup perf-61: uGC never moves objects, so fixed locals need no pinning. -0.12% OpenVM cycles."
+      },
+      {
+        "value": "JitZkSpillKeepReg=1",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixups perf-62/perf-63: locals live only across cold calls stay in caller-saved registers and are spilled at the call. -0.22% OpenVM cycles. JitZkSynthesizeCounts=1, which ZisK also sets, is left out: it adds +1.29% OpenVM cycles."
+      },
+      {"value": "JitZkColdCallSpill=7d", "when": {"optimize": true}, "note": "-0.50% OpenVM cycles; the four options together -2.14%."},
+      {
         "value": "EnableRiscV64Compressed=0",
         "note": "The decoder has no C extension, and a single-threaded guest needs no atomics: the managed .text stays 32-bit and lock-free (dotnet-riscv fixups 24/25). Check with --error-on-compressed / --error-on-atomic."
       },
