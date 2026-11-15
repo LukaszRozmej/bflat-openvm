@@ -46,19 +46,38 @@
       {
         "value": "JitInlineAdditionalMultiplier=3",
         "when": {"optimize": true},
-        "note": "dotnet-riscv fixup perf-57: code size is free on the zkVM and each avoided call saves its ABI overhead. -1.39% OpenVM cycles on the 11 Nethermind stateless blocks (each knob measured against the other three)."
+        "note": "dotnet-riscv fixup perf-57: code size is free on the zkVM and each avoided call saves its ABI overhead."
       },
       {
         "value": "JitZkNoPinning=1",
         "when": {"optimize": true},
-        "note": "dotnet-riscv fixup perf-61: uGC never moves objects, so fixed locals need no pinning. -0.12% OpenVM cycles."
+        "note": "dotnet-riscv fixup perf-61: uGC never moves objects, so fixed locals need no pinning. Sound only with a non-moving GC."
       },
       {
         "value": "JitZkSpillKeepReg=1",
         "when": {"optimize": true},
-        "note": "dotnet-riscv fixups perf-62/perf-63: locals live only across cold calls stay in caller-saved registers and are spilled at the call. -0.22% OpenVM cycles. JitZkSynthesizeCounts=1, which ZisK also sets, is left out: it adds +1.29% OpenVM cycles."
+        "note": "dotnet-riscv fixup perf-63: a local live across a cold call stays in a caller-saved register and is spilled at the call, reloaded only on the paths that make it. Alone it changes little: JitZkColdCallSpill drops the callee-saved preference for such locals."
       },
-      {"value": "JitZkColdCallSpill=7d", "when": {"optimize": true}, "note": "-0.50% OpenVM cycles; the four options together -2.14%."},
+      {
+        "value": "JitZkColdCallSpill=7d",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup perf-63: a call is cold below 0x7d = 125% of the entry block weight (150% for parameters). JitZkSynthesizeCounts=1 (perf-62), which ZisK sets for the block weights, is left out: it makes OpenVM slower."
+      },
+      {
+        "value": "JitZkInlineCloneCheapArgs=1",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup riscv32/07: an inline argument that is a local plus constants is recomputed at each use rather than held in a register."
+      },
+      {
+        "value": "JitZkInitLocallocOnly=1",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup riscv32/07: a method marked to initialize its locals zeroes only its stackalloc. C# writes a local before it reads it."
+      },
+      {
+        "value": "JitZkNewObjInPlace=1",
+        "when": {"optimize": true},
+        "note": "dotnet-riscv fixup riscv32/07: a struct newobj stored straight into an address-taken local is constructed there, not in a zeroed temp copied into it."
+      },
       {
         "value": "EnableRiscV64Compressed=0",
         "note": "The decoder has no C extension, and a single-threaded guest needs no atomics: the managed .text stays 32-bit and lock-free (dotnet-riscv fixups 24/25). Check with --error-on-compressed / --error-on-atomic."
