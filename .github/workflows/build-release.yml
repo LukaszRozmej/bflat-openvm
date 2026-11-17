@@ -350,7 +350,7 @@ jobs:
       # version. Its publish jobs would replace the files of the release
       # that has the version already. Start a new run instead.
       - name: Check that the release does not exist
-        if: github.event_name == 'workflow_dispatch' && inputs.publish != 'No'
+        if: github.event_name == 'workflow_dispatch' && (inputs.publish == 'Staging' || inputs.publish == 'Production')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -402,7 +402,7 @@ jobs:
   # (docs/signing.md in bflat-riscv64).
   sign:
     name: Sign the package
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'No'
+    if: github.event_name == 'workflow_dispatch' && (inputs.publish == 'Staging' || inputs.publish == 'Production')
     needs: build-nupkg
     permissions: {}
     uses: NethermindEth/bflat-riscv64/.github/workflows/sign.yml@34a3e73ad5b2f34a868f5793172dc4a3a97bf382 # master
@@ -413,15 +413,15 @@ jobs:
 
   publish-nupkg:
     name: Publish NuGet package
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'No'
+    if: github.event_name == 'workflow_dispatch' && (inputs.publish == 'Staging' || inputs.publish == 'Production')
     needs: sign
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     env:
-      NUGET_URL: ${{ inputs.publish == 'Staging' && 'https://int.nugettest.org' || 'https://www.nuget.org' }}
-      NUGET_SOURCE: ${{ inputs.publish == 'Staging' && 'https://apiint.nugettest.org' || 'https://api.nuget.org' }}/v3/index.json
+      NUGET_URL: ${{ inputs.publish == 'Production' && 'https://www.nuget.org' || 'https://int.nugettest.org' }}
+      NUGET_SOURCE: ${{ inputs.publish == 'Production' && 'https://api.nuget.org' || 'https://apiint.nugettest.org' }}/v3/index.json
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -470,7 +470,7 @@ jobs:
 
   publish-nupkg-github:
     name: Publish to GitHub
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'No'
+    if: github.event_name == 'workflow_dispatch' && (inputs.publish == 'Staging' || inputs.publish == 'Production')
     needs: [build-nupkg, publish-nupkg]
     runs-on: ubuntu-latest
     permissions:

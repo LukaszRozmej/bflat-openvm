@@ -17,11 +17,19 @@
 # the preflight step below says so plainly instead of letting the login step
 # fail with a bare "Username required".
 #
-# Manual only. After publishing, pin the new digest in the consumers
-# (nethermind's Nethermind.Stateless.OpenVmGuest/Makefile, OPENVM_IMAGE).
+# Docker Hub pushes are manual only. After publishing, pin the new digest in
+# the consumers (nethermind's Nethermind.Stateless.OpenVmGuest/Makefile,
+# OPENVM_IMAGE).
+#
+# Every push to main also pushes ghcr.io/nethermindeth/openvm-runner:<sha> and
+# :main with the default OPENVM_REV of the Dockerfile, so CI jobs can pin the
+# image of a commit by digest instead of building the SDK. Pull requests never
+# run this workflow, so no fork code reaches a job that can push.
 name: Release OpenVM runner
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       openvm_rev:
@@ -41,11 +49,58 @@ permissions:
   contents: read
 
 jobs:
+  ghcr:
+    name: openvm-runner (ghcr)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'NethermindEth/bflat-openvm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: runner
+          push: true
+          tags: |
+            ghcr.io/nethermindeth/openvm-runner:${{ github.sha }}
+            ghcr.io/nethermindeth/openvm-runner:main
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=ghcr
+          cache-to: type=gha,scope=ghcr,mode=max
+
+      - name: Report the digest to pin
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Pin this in the consumers"
+            echo '```'
+            echo "ghcr.io/nethermindeth/openvm-runner:${GITHUB_SHA}@${DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   runner:
     name: openvm-runner
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # Pushes authenticate with Docker Hub OIDC, which trusts only this environment
-    environment: ${{ inputs.push && 'docker-hub' || '' }}
+    environment: ${{ inputs.push == true && 'docker-hub' || '' }}
     permissions:
       contents: read
       id-token: write
@@ -54,10 +109,10 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Check the Docker Hub OIDC variables are present
-        if: inputs.push
+        if: inputs.push == true
         env:
           ORGANIZATION: ${{ vars.DOCKERHUB_ORGANIZATION }}
           CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
@@ -68,8 +123,8 @@ jobs:
           }
 
       - name: Log in to Docker Hub
-        if: inputs.push
-        uses: docker/login-action@v4
+        if: inputs.push == true
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         env:
           DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_OIDC_CONNECTIONID }}
           # The token must outlive the image build, as buildx only pushes at the end
@@ -79,19 +134,24 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: runner
           build-args: OPENVM_REV=${{ inputs.openvm_rev }}
-          push: ${{ inputs.push }}
+          push: ${{ inputs.push == true }}
           tags: nethermindeth/openvm-runner:${{ inputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Report the digest to pin
-        if: inputs.push
+        if: inputs.push == true
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          echo "### Pin this in the consumers" >> "$GITHUB_STEP_SUMMARY"
-          echo '```make' >> "$GITHUB_STEP_SUMMARY"
-          echo "OPENVM_IMAGE ?= nethermindeth/openvm-runner:${{ inputs.image_tag }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Pin this in the consumers"
+            echo '```make'
+            echo "OPENVM_IMAGE ?= nethermindeth/openvm-runner:${IMAGE_TAG}@${DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

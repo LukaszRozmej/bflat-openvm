@@ -22,3 +22,12 @@ rand = { workspace = true }
 serde = { workspace = true }
 hex = { workspace = true }
 eyre = { workspace = true }
+
+[[bin]]
+name = "openvm-runelf"
+path = "src/main.rs"
+
+# Metered execution of many inputs on one compile: instret and trace cost.
+[[bin]]
+name = "openvm-runelf-cost"
+path = "src/cost.rs"

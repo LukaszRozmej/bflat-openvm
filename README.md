@@ -83,6 +83,28 @@ ships no prebuilt `core`, so `-Z build-std` is required. The cross-tool names
 are all overridable (`AS`, `AR`, `RANLIB`, `OBJCOPY`, `OBJDUMP`, `NM`) for
 hosts that spell them differently.
 
+## Runner image
+
+`runner/` builds an image that executes a bflat-built OpenVM guest ELF from
+the SDK, without a source install of OpenVM. Every push to `main` pushes it as
+`ghcr.io/nethermindeth/openvm-runner:<commit sha>` and `:main`; pin the commit
+tag by digest. Docker Hub releases stay manual (`release-runner.yml`).
+
+The image has two programs:
+
+- `openvm-runelf <elf> <input>` (the entrypoint) executes one input and prints
+  `public_values=<hex>`.
+- `openvm-runelf-cost <elf> <input>...` compiles the ELF once and runs metered
+  execution of each input. It prints one line per input, in input order:
+  `RESULT <input> instret=<n> cost=<n> public_values=<hex>`. Input paths must
+  not contain whitespace. Timings go to stderr only.
+
+```console
+$ docker run --rm -v "$PWD:/n" --entrypoint openvm-runelf-cost \
+      ghcr.io/nethermindeth/openvm-runner:<sha>@sha256:<digest> \
+      /n/guest.elf /n/a.raw /n/b.raw
+```
+
 ## Coverage
 
 All 19 accelerators, plus both IO entry points:

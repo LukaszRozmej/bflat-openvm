@@ -10,6 +10,12 @@
 #   docker run --rm -v "$PWD:/n" nethermindeth/openvm-runner:<tag> \
 #       /n/nethermind /n/input.raw
 #
+# The image also has openvm-runelf-cost (src/cost.rs): one compile, then the
+# metered execution of every input, with instret and trace cost per input.
+#
+#   docker run --rm -v "$PWD:/n" --entrypoint openvm-runelf-cost \
+#       ghcr.io/nethermindeth/openvm-runner:<sha> /n/nethermind /n/a.raw /n/b.raw
+#
 # The VM configuration is SdkVmConfig::standard() of the SDK, plus the division
 # hint (src/hints.rs). The guest needs no openvm.toml.
 #
@@ -41,4 +47,5 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates libssl3 \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/target/release/openvm-runelf /usr/local/bin/openvm-runelf
+COPY --from=build /src/target/release/openvm-runelf-cost /usr/local/bin/openvm-runelf-cost
 ENTRYPOINT ["/usr/local/bin/openvm-runelf"]
