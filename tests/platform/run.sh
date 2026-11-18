@@ -6,7 +6,7 @@
 # They moved here from bflat-riscv64 (src/bflat/modules/tests/run_tests.sh)
 # together with the entry point.
 #
-# Requirements: gcc-riscv64-linux-gnu, qemu-user-static (or qemu-user).
+# Requirements: gcc-riscv64-linux-gnu, clang, lld, qemu-user-static (or qemu-user).
 #
 # TEST_SKIP_FAULTS=1 skips the designed-fault (SIGSEGV) tests: qemu-user
 # under nested emulation (Docker Rosetta on Apple silicon) hangs on guest
@@ -46,6 +46,25 @@ CFLAGS="-O1 -g -static -no-pie -std=gnu2x -I${TESTS_DIR}"
 
 mkdir -p "${OUT_DIR}"
 failures=0
+
+for size in 8 16 24 32 ; do
+	name="test_stack32_${size}"
+	if ! clang --target=riscv32-unknown-elf -march=rv32im -mabi=ilp32 -DBSS_SIZE=${size} -c \
+		"${TESTS_DIR}/stack32.S" -o "${OUT_DIR}/${name}.o" || \
+		! ld.lld -T "${PLATFORM_DIR}/../platform32/openvm32.ld" \
+		"${OUT_DIR}/${name}.o" -o "${OUT_DIR}/${name}" ; then
+		echo "BUILD FAIL: ${name}"
+		failures=$((failures + 1))
+		continue
+	fi
+	stack_top=$("${CC%gcc}nm" "${OUT_DIR}/${name}" | awk '$3 == "_init_stack_top" { print $1 }')
+	if [ -z "${stack_top}" ] || [ "$((0x${stack_top} & 15))" != 0 ] ; then
+		echo "FAIL: ${name}: stack is not 16-byte aligned (${stack_top})"
+		failures=$((failures + 1))
+	else
+		echo "PASS: ${name}"
+	fi
+done
 
 # Per-suite wall-clock cap, so that a hang fails the run instead of sitting
 # until the CI job's own timeout.

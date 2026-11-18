@@ -188,7 +188,7 @@ SECTIONS
   . = ALIGN(8);
   PROVIDE(_global_pointer = .);
 
-  . = ALIGN(8);
+  . = ALIGN(16);
   /* Stack grows down from _init_stack_top, carved out of RAM above .bss just
    * as on ZisK. With deep NativeAOT call chains (TypeLoader, cctor recursion)
    * 1 MiB overflowed into .bss; 4 MiB gives ample headroom. */
@@ -201,6 +201,7 @@ SECTIONS
   PROVIDE(_init_stack_bottom  = .);
   . = . + 0x1000000;
   PROVIDE(_init_stack_top     = .);
+  ASSERT((_init_stack_top & 15) == 0, "RV32 stack must be 16-byte aligned")
   PROVIDE(_kernel_heap_bottom = _init_stack_top);
   /* zkVM per-site inline allocator: reserve the top 8 bytes of RAM as a
    * FIXED-address cell holding the downward bump pointer, so the JIT can

@@ -81,6 +81,10 @@ prints `public_values=`, `instret=` and `cost=` for each input. Pushes to
 `main` publish it as `ghcr.io/nethermindeth/openvm-runner:<commit sha>-rv32`
 and `:main-rv32`.
 
+Pass `--execute-only` before the ELF path for correctness checks without
+proving-key setup or cost metering. This mode prints only `public_values=`;
+omit the flag to retain instruction counts and trace costs.
+
 ## Signature
 
 The release workflow signs the `.nupkg` before it publishes it. The build

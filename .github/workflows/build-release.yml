@@ -127,7 +127,7 @@ jobs:
       - name: Run the u256 vectors
         run: |
           : > guests32/empty.raw
-          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test /n/integration-u256 /n/empty.raw | grep '^public_values=')
+          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test --execute-only /n/integration-u256 /n/empty.raw | grep '^public_values=')
           echo "$out"
           [ "$out" = "public_values=0000000000000000bc0100000000000000000000000000000000000000000000" ] \
             || { echo "::error::u256 vectors failed on RV32: $out"; exit 1; }
@@ -135,7 +135,7 @@ jobs:
       - name: Run the secp256k1 vectors
         run: |
           expected=$(python3 tests/secp256k1/test_ecrecover.py --openvm-vectors guests32/vectors.bin)
-          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test /n/secp256k1-guest /n/vectors.bin | grep '^public_values=')
+          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test --execute-only /n/secp256k1-guest /n/vectors.bin | grep '^public_values=')
           echo "$out"
           [ "$out" = "public_values=$expected" ] \
             || { echo "::error::secp256k1 vectors failed on RV32: expected $expected"; exit 1; }
@@ -153,7 +153,7 @@ jobs:
       - name: Install the RISC-V toolchain and qemu-user
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-riscv64-linux-gnu qemu-user-static
+          sudo apt-get install -y gcc-riscv64-linux-gnu clang lld qemu-user-static
 
       - name: Build the platform files
         run: platform/build.sh
