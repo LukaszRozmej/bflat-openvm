@@ -138,6 +138,32 @@ __wrap_memcpy:
     ld      t5, -8(a3)
     li      t1, 32
     bltu    a2, t1, .Lwords
+    /* 64 bytes per iteration while they last, since the loop's count, pointer
+     * and branch instructions cost as much as its loads and stores. */
+    li      a6, 64
+    bltu    a2, a6, .Lblocks
+.Lblocks64:
+    ld      t2, 0(a1)
+    ld      t3, 8(a1)
+    ld      t4, 16(a1)
+    ld      a5, 24(a1)
+    sd      t2, 0(t6)
+    sd      t3, 8(t6)
+    sd      t4, 16(t6)
+    sd      a5, 24(t6)
+    ld      t2, 32(a1)
+    ld      t3, 40(a1)
+    ld      t4, 48(a1)
+    ld      a5, 56(a1)
+    sd      t2, 32(t6)
+    sd      t3, 40(t6)
+    sd      t4, 48(t6)
+    sd      a5, 56(t6)
+    addi    a1, a1, 64
+    addi    t6, t6, 64
+    addi    a2, a2, -64
+    bgeu    a2, a6, .Lblocks64
+    bltu    a2, t1, .Lwords
 .Lblocks:
     ld      t2, 0(a1)
     ld      t3, 8(a1)
