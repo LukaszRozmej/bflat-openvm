@@ -5,7 +5,6 @@
 //! Both sides map onto OpenVM's own guest IO, the same way ere-guests'
 //! `ere_platform_openvm` does.
 
-use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 
 /// Cached input. `read_input` is specified to be idempotent, and OpenVM's
@@ -15,22 +14,41 @@ use core::ptr::addr_of_mut;
 /// A plain `static mut` is sound here: an OpenVM guest is single-threaded by
 /// construction (there is no thread creation instruction), so no two callers
 /// can ever race.
-static mut INPUT: Option<Vec<u8>> = None;
+static mut INPUT: Option<(*const u8, usize)> = None;
+
+#[cfg(not(target_arch = "riscv32"))]
+fn read_bytes() -> (*const u8, usize) {
+    let input = openvm::io::read_vec().leak();
+    (input.as_mut_ptr(), input.len())
+}
+
+#[cfg(target_arch = "riscv32")]
+fn read_bytes() -> (*const u8, usize) {
+    use alloc::boxed::Box;
+    use openvm_algebra_guest::openvm_rv32im_guest::{hint_buffer_chunked, hint_input};
+
+    hint_input();
+    let len = openvm::io::read_u32() as usize;
+    // Trusted-input items are eight-byte aligned relative to the payload. Read
+    // directly into storage with that alignment so the guest can use them in place.
+    let words = Box::leak(Box::<[u64]>::new_uninit_slice(len.div_ceil(8)));
+    let data = words.as_mut_ptr().cast::<u8>();
+    hint_buffer_chunked(data, len.div_ceil(4));
+    (data, len)
+}
 
 /// `void read_input(const uint8_t** buf_ptr, size_t* buf_size)`.
 ///
-/// The buffer stays alive for the life of the guest: it is owned by the
-/// `INPUT` static and never dropped, which is what lets us hand out a raw
-/// pointer the caller may keep.
+/// The first call retains the buffer for the life of the guest.
 #[no_mangle]
 pub unsafe extern "C" fn read_input(buf_ptr: *mut *const u8, buf_size: *mut usize) {
     assert!(!buf_ptr.is_null() && !buf_size.is_null(), "read_input: NULL out-parameter");
 
     let slot = &mut *addr_of_mut!(INPUT);
-    let input = slot.get_or_insert_with(openvm::io::read_vec);
+    let (data, len) = *slot.get_or_insert_with(read_bytes);
 
-    buf_ptr.write(input.as_ptr());
-    buf_size.write(input.len());
+    buf_ptr.write(data);
+    buf_size.write(len);
 }
 
 /// OpenVM's user public output is a byte-addressed buffer written a u64 at a
