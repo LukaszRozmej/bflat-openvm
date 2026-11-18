@@ -5,7 +5,6 @@
 //! Both sides map onto OpenVM's own guest IO, the same way ere-guests'
 //! `ere_platform_openvm` does.
 
-use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 
 /// Cached input. `read_input` is specified to be idempotent, and OpenVM's
@@ -15,7 +14,7 @@ use core::ptr::addr_of_mut;
 /// A plain `static mut` is sound here: an OpenVM guest is single-threaded by
 /// construction (there is no thread creation instruction), so no two callers
 /// can ever race.
-static mut INPUT: Option<Vec<u8>> = None;
+static mut INPUT: Option<(*const u8, usize)> = None;
 
 /// `void read_input(const uint8_t** buf_ptr, size_t* buf_size)`.
 ///
@@ -27,10 +26,36 @@ pub unsafe extern "C" fn read_input(buf_ptr: *mut *const u8, buf_size: *mut usiz
     assert!(!buf_ptr.is_null() && !buf_size.is_null(), "read_input: NULL out-parameter");
 
     let slot = &mut *addr_of_mut!(INPUT);
-    let input = slot.get_or_insert_with(openvm::io::read_vec);
+    let (ptr, len) = *slot.get_or_insert_with(read_record);
 
-    buf_ptr.write(input.as_ptr());
-    buf_size.write(input.len());
+    buf_ptr.write(ptr);
+    buf_size.write(len);
+}
+
+/// The next record of the hint stream, in a buffer that is never freed.
+#[cfg(target_pointer_width = "64")]
+fn read_record() -> (*const u8, usize) {
+    let input = core::mem::ManuallyDrop::new(openvm::io::read_vec());
+    (input.as_ptr(), input.len())
+}
+
+/// The next record of the hint stream, in an 8-aligned buffer that is never freed.
+///
+/// On OpenVM's RV32 line `read_vec` returns a buffer aligned only to the 4 bytes
+/// of its allocator's minimum. The guest uses an item of its input in place only
+/// at an 8-aligned address and copies the others, so the record is read here, a
+/// word at a time as `read_vec` does, into a buffer aligned to 8.
+#[cfg(target_pointer_width = "32")]
+fn read_record() -> (*const u8, usize) {
+    openvm_rv32im_guest::hint_input();
+    let len = openvm::io::read_u32() as usize;
+    let words = len.div_ceil(4);
+    let layout = alloc::alloc::Layout::from_size_align(words.max(1) * 4, 8).expect("input too large");
+    // SAFETY: the layout is nonzero; the hint stores write `words` words into it.
+    let ptr = unsafe { alloc::alloc::alloc(layout) };
+    assert!(!ptr.is_null(), "read_input: out of memory");
+    openvm_rv32im_guest::hint_buffer_chunked(ptr, words);
+    (ptr, len)
 }
 
 /// OpenVM's user public output is a byte-addressed buffer written a u64 at a

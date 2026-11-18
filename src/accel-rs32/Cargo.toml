@@ -27,6 +27,8 @@ openvm-ecc-guest     = { git = "https://github.com/openvm-org/openvm.git", branc
 openvm-k256          = { git = "https://github.com/openvm-org/openvm.git", branch = "main", package = "k256" }
 openvm-p256          = { git = "https://github.com/openvm-org/openvm.git", branch = "main", package = "p256" }
 openvm-pairing       = { git = "https://github.com/openvm-org/openvm.git", branch = "main", features = ["bn254", "bls12_381"] }
+# The hint-stream reads of src/io.rs's 8-aligned input buffer.
+openvm-rv32im-guest  = { git = "https://github.com/openvm-org/openvm.git", branch = "main" }
 
 [profile.release]
 opt-level = 3

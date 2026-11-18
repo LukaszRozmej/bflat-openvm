@@ -183,6 +183,7 @@ dependencies = [
  "openvm-algebra-guest",
  "openvm-ecc-guest",
  "openvm-pairing",
+ "openvm-rv32im-guest",
  "p256",
 ]
 
