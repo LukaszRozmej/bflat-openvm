@@ -18,7 +18,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://nethermind.io</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>openvm;zkvm;riscv64</PackageTags>
+    <PackageTags>openvm;zkvm;riscv64;riscv32</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/nethermindeth/bflat-openvm</RepositoryUrl>
   </PropertyGroup>
@@ -28,6 +28,11 @@
          object, linker scripts). The manifests name the other files by bare
          name, so all of them stay side by side. -->
     <None Update="runtimes/linux-riscv64/native/*">
+      <Pack>true</Pack>
+      <PackagePath>%(RelativeDir)%(Filename)%(Extension)</PackagePath>
+    </None>
+    <!-- The same for OpenVM's RV32 line (build/build.sh with ARCH=riscv32). -->
+    <None Update="runtimes/linux-riscv32/native/*">
       <Pack>true</Pack>
       <PackagePath>%(RelativeDir)%(Filename)%(Extension)</PackagePath>
     </None>

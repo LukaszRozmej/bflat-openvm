@@ -57,6 +57,30 @@ $ bflat build app.cs --os linux --arch riscv64 --libc openvm \
       --extlib path/to/libopenvm.bflat.manifest
 ```
 
+## RV32
+
+The package also carries the same bindings for OpenVM's RV32 line (`main`),
+in `runtimes/linux-riscv32/native/`, for guests built with
+`--arch riscv32 --libc openvm32`:
+
+- `libopenvm32.a`: the sources of `src/accel-rs` built against OpenVM's
+  `main` (`src/accel-rs32`), and the intrinsics without the division hint,
+  which only the RV64 runner has. openvm-eth publishes its accelerators only
+  on its RV64 branch, so `build/build.sh` checks that branch out at a pinned
+  commit and points its OpenVM dependencies at `main`.
+- `platform32/`: the entry point, the memory map below OpenVM's 512 MiB and
+  the platform manifest. OpenVM's RV32 memory is word-granular, so the JIT
+  keeps the no-unaligned-access mode of the Airbender platform.
+
+```console
+$ ARCH=riscv32 ./build/build.sh      # into output32/
+```
+
+`runner32/` is the RV32 runner image: `openvm-runelf <elf> [-] <input>...`
+prints `public_values=`, `instret=` and `cost=` for each input. Pushes to
+`main` publish it as `ghcr.io/nethermindeth/openvm-runner:<commit sha>-rv32`
+and `:main-rv32`.
+
 ## Signature
 
 The release workflow signs the `.nupkg` before it publishes it. The build

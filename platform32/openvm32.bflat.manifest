@@ -1,0 +1,177 @@
+{
+  "$schema": "https://raw.githubusercontent.com/NethermindEth/bflat-riscv64/master/src/bflat/bflat-manifest.schema.json",
+  "schema": 2,
+  "name": "openvm32",
+  "version": "1.0.0",
+  "description": "The OpenVM main (RV32IM) platform for bflat guests",
+  "note": "OpenVM main proves RV32IM. Its memory is word-granular: word loads and stores must be 4-aligned, and a misaligned one does not trap but computes the wrong value. Guest memory is 512 MiB (MEM_BITS 29).",
+  "ilc": {
+    "defines": [
+      "ZKVM_OPENVM"
+    ]
+  },
+  "codegen": {
+    "abi": "ilp32",
+    "isa": {
+      "disable": [
+        "c",
+        "a",
+        "f",
+        "d",
+        "zba",
+        "zbb",
+        "zbs",
+        "zicond"
+      ]
+    },
+    "options": [
+      {
+        "value": "EnableRiscV64Compressed=0",
+        "note": "The decoder has no C extension, and a single-hart guest needs no atomics (dotnet-riscv fixups 24/25)."
+      },
+      "EnableRiscV64Atomic=0",
+      {
+        "value": "JitNoUnalignedAccess=1",
+        "note": "The JIT expands byte-wise the accesses flagged unaligned and those whose constant offset alone breaks the alignment, and trusts the alignment of every base, as on Airbender. Testing every access at run time (JitRiscV64StrictAlign) doubles the code."
+      },
+      "JitRiscV64StrictAlign=0",
+      {
+        "value": "JitObjectStackAllocation=1",
+        "when": {
+          "optimize": true
+        }
+      },
+      {
+        "value": "JitForceInlineMaxIL=200",
+        "when": {
+          "optimize": true
+        },
+        "note": "A callee marked AggressiveInlining with up to 0x200 (512) bytes of IL is inlined, as on Airbender. On rv32 every inlined 64-bit operation takes twice the code, so the other inlining caps stay at their defaults."
+      },
+      {
+        "value": "RiscV64ElideLeafRaSave=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "Elide the RA spill/reload and frame in leaf methods (dotnet-riscv patches 23 and 31). Sound only on a single-threaded deterministic guest with no GC thread suspension and no return-address hijacking."
+      },
+      {
+        "value": "JitZkNoPinning=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "The zkVM register tuning of ZisK (perf-61/62/63, patches 23 and 31): every callee-saved register a method touches costs its save and restore, and the guest links the non-moving, non-collecting uGC."
+      },
+      {
+        "value": "JitZkSynthesizeCounts=1",
+        "when": {
+          "optimize": true
+        }
+      },
+      {
+        "value": "JitZkSpillKeepReg=1",
+        "when": {
+          "optimize": true
+        }
+      },
+      {
+        "value": "JitZkColdCallSpill=7d",
+        "when": {
+          "optimize": true
+        }
+      },
+      {
+        "value": "JitZkHandlerConv=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "The EVM guest's handlers take their arguments in s1-s8, which no call or delegation in them clobbers: -3.3% cycles."
+      },
+      {
+        "value": "JitZkInlineCloneCheapArgs=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "An inline argument that is a local plus constants is recomputed at each use rather than held in a register the delegations' operand moves go through: -0.5% cycles."
+      },
+      {
+        "value": "JitZkNoCheapAddCSE=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "For the same reason a local plus a constant is not CSEd outside loops: -0.15% cycles."
+      },
+      {
+        "value": "JitZkNoCastAwayGcTemp=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "uGC never scans stacks (JitZkNoGcMustInit), so a byref cast to a pointer needs no non-GC temp: the operands of a delegation go straight to their registers. -0.7% cycles."
+      },
+      {
+        "value": "JitZkForwardSubCheap=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "A temp the importer spilled for such a value is cloned into its uses in the block too: -0.2% cycles."
+      },
+      {
+        "value": "JitZkInitLocallocOnly=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "A method marked to initialize its locals zeroes only its stackalloc, as SkipLocalsInit would zero nothing: C# writes a local before it reads it. -0.26% cycles."
+      },
+      {
+        "value": "JitZkNewObjInPlace=1",
+        "when": {
+          "optimize": true
+        },
+        "note": "A struct newobj stored straight into a local whose address the method takes is constructed there, not in a zeroed temp copied into it."
+      }
+    ]
+  },
+  "checks": {
+    "float": true,
+    "compressed": true,
+    "atomic": true
+  },
+  "platform": {
+    "aliases": {
+      "libc": "openvm32"
+    },
+    "base": {
+      "os": "linux",
+      "arch": "riscv32",
+      "libc": "musl"
+    },
+    "requires": [
+      "nofp",
+      "ubootstrap",
+      "stdcppshim",
+      "rhp",
+      "gs_cookie",
+      "rhp_native",
+      "pal",
+      "eh",
+      "tls",
+      "rng_stupid",
+      "rust_sys",
+      "ugc-zero",
+      "nothread",
+      "noos",
+      "guest_subst"
+    ],
+    "flags": [
+      "no-atomics",
+      "noos",
+      "no-console"
+    ],
+    "note": "No JitZkBumpAddr: the rv32 guest keeps the allocation helper call.",
+    "linker_script": "openvm32.ld",
+    "entry": "openvm32_entry.o"
+  },
+  "metadata": {
+    "openvm_ref": "main"
+  }
+}

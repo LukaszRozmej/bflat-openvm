@@ -1,0 +1,22 @@
+# Execution harness for a bflat-built OpenVM RV32 guest (OpenVM `main`), the
+# counterpart of runner/ for the RV64 line.
+#
+# Built as a member of the OpenVM workspace (see Dockerfile): openvm-sdk and
+# friends are workspace dependencies there and do not resolve standalone.
+[package]
+name = "openvm-runelf32"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+openvm-sdk = { workspace = true }
+openvm-sdk-config = { workspace = true }
+openvm-circuit = { workspace = true }
+openvm-transpiler = { workspace = true }
+openvm-stark-sdk = { workspace = true }
+hex = { workspace = true }
+eyre = { workspace = true }
+
+[[bin]]
+name = "openvm-runelf"
+path = "src/main.rs"

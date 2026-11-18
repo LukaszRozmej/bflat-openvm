@@ -1,7 +1,9 @@
 output/
+output32/
 tmp/
 *.o
 src/accel-rs/target/
+src/accel-rs32/target/
 tests/secp256k1/target/
 src/runtime/runtimes/
 src/runtime/*.bflat.manifest

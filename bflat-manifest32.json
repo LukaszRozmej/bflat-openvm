@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/NethermindEth/bflat-riscv64/master/src/bflat/bflat-manifest.schema.json",
+  "schema": 2,
+  "name": "libopenvm32",
+  "version": "1.0.0",
+  "description": "OpenVM accelerators (libopenvm) for bflat guests",
+  "when": {
+    "platform": "openvm32"
+  },
+  "objects": [
+    {
+      "file": "libopenvm32.a",
+      "group": "pre-entry",
+      "note": "In front of the linker script, where bflat linked --extlib static libraries before schema 2."
+    }
+  ]
+}

@@ -70,6 +70,75 @@ jobs:
             output/openvm.bflat.manifest
           if-no-files-found: error
 
+      # The same layers for OpenVM's RV32 line (`main`), with the platform of platform32/.
+      - name: Build the RV32 static library
+        run: ARCH=riscv32 ./build/build.sh
+
+      - name: Upload the RV32 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: libopenvm32
+          path: |
+            output32/libopenvm32.a
+            output32/libopenvm32.bflat.manifest
+            output32/openvm32_entry.o
+            output32/openvm32.ld
+            output32/openvm32.bflat.manifest
+          if-no-files-found: error
+
+  rv32-guests:
+    # The RV32 counterpart of link-guest and the vector jobs: the same three
+    # guests, linked for --libc openvm32 by the riscv32 bflat image that the
+    # Nethermind guests are built with, then executed on the RV32 runner of
+    # this commit (runner32/).
+    name: Link and run the RV32 guests
+    needs: build-libopenvm
+    runs-on: ubuntu-latest
+    env:
+      BFLAT_IMAGE: nethermindeth/bflat-riscv64-11-riscv32:6f19b2372aaa412e227674255cbc11314f258028@sha256:15052345e030e87b51bc63eaf04b32626cb84a66627c1ee6aad0925fbe229a09
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Download the libopenvm32 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: libopenvm32
+          path: output32
+
+      - name: Link the guests
+        run: |
+          set -e
+          for g in tests/integration/guest.cs tests/integration/u256.cs tests/secp256k1/guest.cs ; do
+            out=$(basename "$(dirname "$g")")-$(basename "$g" .cs)
+            docker run --rm -v "$PWD:/b" -w /b "$BFLAT_IMAGE" \
+              bflat build "$g" \
+                --os linux --arch riscv32 --libc openvm32 --stdlib dotnet \
+                --no-pie --no-pthread -Ot \
+                --extlib /b/output32/libopenvm32.bflat.manifest \
+                -o "guests32/$out"
+          done
+          ls -la guests32
+
+      - name: Build the RV32 runner
+        run: docker build -t openvm-runner32-test runner32
+
+      - name: Run the u256 vectors
+        run: |
+          : > guests32/empty.raw
+          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test /n/integration-u256 /n/empty.raw | grep '^public_values=')
+          echo "$out"
+          [ "$out" = "public_values=0000000000000000bc0100000000000000000000000000000000000000000000" ] \
+            || { echo "::error::u256 vectors failed on RV32: $out"; exit 1; }
+
+      - name: Run the secp256k1 vectors
+        run: |
+          expected=$(python3 tests/secp256k1/test_ecrecover.py --openvm-vectors guests32/vectors.bin)
+          out=$(docker run --rm -v "$PWD/guests32:/n" openvm-runner32-test /n/secp256k1-guest /n/vectors.bin | grep '^public_values=')
+          echo "$out"
+          [ "$out" = "public_values=$expected" ] \
+            || { echo "::error::secp256k1 vectors failed on RV32: expected $expected"; exit 1; }
+
   platform-tests:
     # platform/entry.S, the bflat entry point of the guest: _start for the
     # OpenVM entry, and the 64-bit memcpy/memmove/memset, cross-compiled and run under
@@ -305,7 +374,7 @@ jobs:
 
   build-nupkg:
     name: Build NuGet package
-    needs: [build-libopenvm, run-divrem-vectors, run-secp256k1-guest, run-u256-vectors]
+    needs: [build-libopenvm, run-divrem-vectors, run-secp256k1-guest, run-u256-vectors, rv32-guests]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -323,11 +392,18 @@ jobs:
         with:
           name: libopenvm
 
+      - name: Download libopenvm32 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: libopenvm32
+          path: libopenvm32
+
       - name: Move artifacts into the package project
         run: |
-          mkdir -p src/runtime/runtimes/linux-riscv64/native
+          mkdir -p src/runtime/runtimes/linux-riscv64/native src/runtime/runtimes/linux-riscv32/native
           mv libopenvm.a libopenvm.bflat.manifest openvm_entry.o openvm.ld openvm.bflat.manifest \
              src/runtime/runtimes/linux-riscv64/native/
+          mv libopenvm32/* src/runtime/runtimes/linux-riscv32/native/
 
       - name: Detect version
         id: version
@@ -368,6 +444,13 @@ jobs:
             jq --arg ref "$OPENVM_REF" --arg version "$VERSION" \
               '.version = $version | .metadata.openvm_ref = $ref' \
               "$MANIFEST" > "$MANIFEST.tmp"
+            mv "$MANIFEST.tmp" "$MANIFEST"
+          done
+
+          # The RV32 files are built from OpenVM's `main`, which their
+          # manifests already name: only the version changes.
+          for MANIFEST in src/runtime/runtimes/linux-riscv32/native/*.bflat.manifest ; do
+            jq --arg version "$VERSION" '.version = $version' "$MANIFEST" > "$MANIFEST.tmp"
             mv "$MANIFEST.tmp" "$MANIFEST"
           done
 
@@ -488,6 +571,12 @@ jobs:
           name: libopenvm
           path: libopenvm
 
+      - name: Download libopenvm32 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: libopenvm32
+          path: libopenvm32
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
@@ -502,6 +591,11 @@ jobs:
             libopenvm/openvm_entry.o
             libopenvm/openvm.ld
             libopenvm/openvm.bflat.manifest
+            libopenvm32/libopenvm32.a
+            libopenvm32/libopenvm32.bflat.manifest
+            libopenvm32/openvm32_entry.o
+            libopenvm32/openvm32.ld
+            libopenvm32/openvm32.bflat.manifest
           body: |
             OpenVM zkVM accelerators for bflat guests.
 

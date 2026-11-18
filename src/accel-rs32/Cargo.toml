@@ -1,0 +1,39 @@
+[package]
+name = "bflat-openvm-accel32"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "eth-act zkVM accelerator and IO C ABI for OpenVM main (RV32), packaged as a staticlib"
+
+# The sources of src/accel-rs, built for OpenVM's RV32 line. Only the
+# dependency graph differs: `main` instead of `develop-v2.1.0`.
+[lib]
+name = "openvmaccel"
+crate-type = ["staticlib"]
+path = "../accel-rs/src/lib.rs"
+
+# openvm-accelerators exists only on openvm-eth's develop-v2.1.0 branch, which
+# builds it against OpenVM's develop-v2.1.0, the RV64 line. Cargo cannot patch
+# a git source with another branch of the same repository, so build/build.sh
+# checks openvm-eth out at OPENVM_ETH_REV into tmp/, points its OpenVM
+# dependencies at `main`, and the [patch] below takes the crate from there.
+# The accelerators and our init.rs then share one copy of each OpenVM type
+# (see the note on branch references in src/accel-rs/Cargo.toml).
+[dependencies]
+openvm-accelerators = { git = "https://github.com/axiom-crypto/openvm-eth.git", branch = "develop-v2.1.0", default-features = false }
+openvm               = { git = "https://github.com/openvm-org/openvm.git", branch = "main", default-features = false }
+openvm-algebra-guest = { git = "https://github.com/openvm-org/openvm.git", branch = "main" }
+openvm-ecc-guest     = { git = "https://github.com/openvm-org/openvm.git", branch = "main" }
+openvm-k256          = { git = "https://github.com/openvm-org/openvm.git", branch = "main", package = "k256" }
+openvm-p256          = { git = "https://github.com/openvm-org/openvm.git", branch = "main", package = "p256" }
+openvm-pairing       = { git = "https://github.com/openvm-org/openvm.git", branch = "main", features = ["bn254", "bls12_381"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+
+[patch."https://github.com/axiom-crypto/openvm-eth.git"]
+openvm-accelerators = { path = "../../tmp/openvm-eth/crates/accelerators" }

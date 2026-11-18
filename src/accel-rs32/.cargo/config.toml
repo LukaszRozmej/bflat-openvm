@@ -1,0 +1,5 @@
+# The cfg as in src/accel-rs/.cargo/config.toml. lower-atomic turns every
+# atomic operation into a plain load and store: OpenVM decodes RV32IM, no A
+# extension, and the guest is single-hart (see src/accel-rs/src/sync.rs).
+[build]
+rustflags = ["--cfg", "openvm_intrinsics", "-C", "passes=lower-atomic"]

@@ -5,9 +5,9 @@
 # RUN a bflat guest has to build the SDK from source, which is the long pole in
 # any job that touches it. This publishes it once.
 #
-# The revision is on the rv64 line (branch develop-v2.1.0); `main` is still
-# rv32 and rejects a 64-bit ELF outright. Pinned to a commit so the image is
-# reproducible.
+# runner/ is the harness of the rv64 line (branch develop-v2.1.0), runner32/
+# that of the rv32 line (`main`): each line rejects the other's ELF outright.
+# Each Dockerfile pins its revision to a commit so the image is reproducible.
 #
 # Published to Docker Hub, alongside the other images the guests use
 # (nethermindeth/zisk, nethermindeth/bflat-riscv64). Logs in with OIDC: needs
@@ -18,11 +18,12 @@
 # fail with a bare "Username required".
 #
 # Docker Hub pushes are manual only. After publishing, pin the new digest in
-# the consumers (nethermind's Nethermind.Stateless.OpenVmGuest/Makefile,
-# OPENVM_IMAGE).
+# the consumers (nethermind's Nethermind.Stateless.OpenVMGuest/Makefile and
+# Nethermind.Stateless.OpenVM32Guest/Makefile, OPENVM_IMAGE).
 #
 # Every push to main also pushes ghcr.io/nethermindeth/openvm-runner:<sha> and
-# :main with the default OPENVM_REV of the Dockerfile, so CI jobs can pin the
+# :main, and <sha>-rv32 and :main-rv32 from runner32/, with the default
+# OPENVM_REV of each Dockerfile, so CI jobs can pin the
 # image of a commit by digest instead of building the SDK. Pull requests never
 # run this workflow, so no fork code reaches a job that can push.
 name: Release OpenVM runner
@@ -32,10 +33,17 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      line:
+        description: "OpenVM line: rv64 (runner/, develop-v2.1.0) or rv32 (runner32/, main)"
+        type: choice
+        default: rv64
+        options:
+          - rv64
+          - rv32
       openvm_rev:
-        description: OpenVM commit on the rv64 line to build the harness from
+        description: OpenVM commit on that line to build the harness from (empty = the Dockerfile's)
         type: string
-        default: 56d5e4dbb545662f7ba3c31ac6c3e0ab1c6a481d
+        default: ""
       image_tag:
         description: Image tag
         type: string
@@ -50,8 +58,17 @@ permissions:
 
 jobs:
   ghcr:
-    name: openvm-runner (ghcr)
+    name: openvm-runner ${{ matrix.line }} (ghcr)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'NethermindEth/bflat-openvm'
+    strategy:
+      matrix:
+        include:
+          - line: rv64
+            context: runner
+            suffix: ""
+          - line: rv32
+            context: runner32
+            suffix: -rv32
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -75,23 +92,24 @@ jobs:
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: runner
+          context: ${{ matrix.context }}
           push: true
           tags: |
-            ghcr.io/nethermindeth/openvm-runner:${{ github.sha }}
-            ghcr.io/nethermindeth/openvm-runner:main
+            ghcr.io/nethermindeth/openvm-runner:${{ github.sha }}${{ matrix.suffix }}
+            ghcr.io/nethermindeth/openvm-runner:main${{ matrix.suffix }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha,scope=ghcr
-          cache-to: type=gha,scope=ghcr,mode=max
+          cache-from: type=gha,scope=ghcr${{ matrix.suffix }}
+          cache-to: type=gha,scope=ghcr${{ matrix.suffix }},mode=max
 
       - name: Report the digest to pin
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          SUFFIX: ${{ matrix.suffix }}
         run: |
           {
             echo "### Pin this in the consumers"
             echo '```'
-            echo "ghcr.io/nethermindeth/openvm-runner:${GITHUB_SHA}@${DIGEST}"
+            echo "ghcr.io/nethermindeth/openvm-runner:${GITHUB_SHA}${SUFFIX}@${DIGEST}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -136,12 +154,12 @@ jobs:
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: runner
-          build-args: OPENVM_REV=${{ inputs.openvm_rev }}
+          context: ${{ inputs.line == 'rv32' && 'runner32' || 'runner' }}
+          build-args: ${{ inputs.openvm_rev != '' && format('OPENVM_REV={0}', inputs.openvm_rev) || '' }}
           push: ${{ inputs.push == true }}
           tags: nethermindeth/openvm-runner:${{ inputs.image_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ inputs.line }}
+          cache-to: type=gha,scope=${{ inputs.line }},mode=max
 
       - name: Report the digest to pin
         if: inputs.push == true

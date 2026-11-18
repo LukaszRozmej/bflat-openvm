@@ -104,6 +104,11 @@ OPENVM_R3  zkvm_u256_slt,               0b101, 8
 OPENVM_R3  zkvm_u256_sltu,              0b101, 9
 OPENVM_R3  zkvm_u256_mul,               0b101, 10
 
+/* The division hint and its checks are RV64 only: the rv32 runner has no
+ * hint, and the checks are RV64IM routines. build/build.sh assembles the
+ * rv32 library with --defsym OPENVM_RV32=1. */
+.ifndef OPENVM_RV32
+
 /* ---- 512-by-256-bit division hint --------------------------------------
  * Not instructions of OpenVM's extensions: a phantom only runner/ registers,
  * and two plain RV64IM routines that check its answer. Together they give a
@@ -294,3 +299,5 @@ zkvm_u512_is_divrem:
     ret
     .cfi_endproc
     .size zkvm_u512_is_divrem, .-zkvm_u512_is_divrem
+
+.endif /* OPENVM_RV32 */
