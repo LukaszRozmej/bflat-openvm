@@ -109,6 +109,7 @@ jobs:
       - name: Link the guests
         run: |
           set -e
+          mkdir -p guests32
           for g in tests/integration/guest.cs tests/integration/u256.cs tests/secp256k1/guest.cs ; do
             out=$(basename "$(dirname "$g")")-$(basename "$g" .cs)
             docker run --rm -v "$PWD:/b" -w /b "$BFLAT_IMAGE" \
