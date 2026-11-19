@@ -1,5 +1,7 @@
 # The cfg as in src/accel-rs/.cargo/config.toml. lower-atomic turns every
 # atomic operation into a plain load and store: OpenVM decodes RV32IM, no A
 # extension, and the guest is single-hart (see src/accel-rs/src/sync.rs).
+# max-store-memcpy: on RV32 a 64-byte point or a pair of field elements is
+# past LLVM's default of eight stores, so each move of one called memcpy.
 [build]
-rustflags = ["--cfg", "openvm_intrinsics", "-C", "passes=lower-atomic"]
+rustflags = ["--cfg", "openvm_intrinsics", "-C", "passes=lower-atomic", "-C", "llvm-args=--max-store-memcpy=32 --max-store-memset=32"]
